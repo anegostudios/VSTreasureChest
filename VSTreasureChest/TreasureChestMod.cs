@@ -12,6 +12,8 @@ namespace Vintagestory.TreasureChest
         private ICoreServerAPI api;
         private int chunkSize;
 
+        private ISet<string> treeTypes;
+
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.api = api;
@@ -19,30 +21,42 @@ namespace Vintagestory.TreasureChest
 
             this.api.RegisterCommand("treasure", "Place a treasure chest with random items", "", PlaceTreasureChest, Privilege.controlserver);
 
+            this.treeTypes = new HashSet<string>();
+            WorldProperty treetypes = api.Assets.TryGet("worldproperties/block/wood.json").ToObject<WorldProperty>();
+            foreach (WorldPropertyVariant variant in treetypes.Variants)
+            {
+                treeTypes.Add("log-" + variant.Code + "-ud");
+            }
+
             //TODO: Uncomment when we are ready to load on chunk generation
-            //this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.TerrainFeatures);
+            this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Vegetation);
         }
 
         private void OnChunkColumnGeneration(IServerChunk[] chunks, int chunkX, int chunkZ)
         {
-            BlockPos blockPos = new BlockPos();
-
-            for (int i = 0; i < chunks.Length; i++)
+            if(ShouldPlaceChest())
             {
-                IServerChunk chunk = chunks[i];
-                for (int x = 0; x < chunks.Length; x++)
-                {
-                    for (int z = 0; z < chunks.Length; z++)
-                    {
-                        for (int y = 0; y < chunks.Length; y++)
-                        {
-                            blockPos.X = x;
-                            blockPos.Y = y;
-                            blockPos.Z = z;
+                BlockPos blockPos = new BlockPos();
 
-                            if (IsValidChestLocation(chunk, x, y, z))
+                for (int i = 0; i < chunks.Length; i++)
+                {
+                    IServerChunk chunk = chunks[i];
+                    for (int x = 0; x < chunks.Length; x++)
+                    {
+                        for (int z = 0; z < chunks.Length; z++)
+                        {
+                            for (int y = 0; y < chunks.Length; y++)
                             {
-                                PlaceTreasureChest(blockPos);
+                                blockPos.X = x;
+                                blockPos.Y = y;
+                                blockPos.Z = z;
+
+                                BlockPos chestLocation = GetChestLocation(chunk, x, y, z);
+                                if(chestLocation != null)
+                                {
+                                    PlaceTreasureChest(ToWorldCoordinates(chunk, chestLocation));
+                                    return;
+                                }
                             }
                         }
                     }
@@ -50,17 +64,42 @@ namespace Vintagestory.TreasureChest
             }
         }
 
-        private bool IsValidChestLocation(IServerChunk chunk, int x, int y, int z)
+        //TODO: Need to figure out how to convert local chunk coordinates to world coordinates.(Need chunk x,z coordinates);
+        private BlockPos ToWorldCoordinates(IServerChunk chunk, BlockPos chunkCoordinates)
         {
-            int sunlight = GetSunlight(chunk, x, y, z);
-            if (sunlight < 9)
-            {
-                Block block = GetBlock(chunk, x, y, z);
+            int chunkX = 0;
+            int chunkZ = 0;
+            return new BlockPos(chunkX * chunkSize + chunkCoordinates.X, chunkCoordinates.Y, chunkZ * chunkSize + chunkCoordinates.Z);
+        }
 
-                //TODO: add more conditions later, like are we beside a wall, on the floor
-                return true;
+        //TODO: Always places a single chest in a chunk for testing.
+        private bool ShouldPlaceChest()
+        {
+            return true;
+            //int randomNumber = api.World.Rand.Next(0, 100);
+            //return randomNumber > 1 && randomNumber <= 6;//5% chance
+        }
+
+        private BlockPos GetChestLocation(IServerChunk chunk, int x, int y, int z)
+        {
+            Block block = GetBlock(chunk, x, y, z);
+            if(IsTree(block))
+            {
+                for(int i = y; i > 0; i--)
+                {
+                    Block underBlock = GetBlock(chunk, x, i, z);
+                    if(!IsTree(underBlock))
+                    {
+                        return new BlockPos(x, i + 1, z);
+                    }
+                }
             }
-            return false;
+            return null;
+        }
+
+        private bool IsTree(Block block)
+        {
+            return treeTypes.Contains(block.Code);            
         }
 
         private Block GetBlock(IServerChunk chunk, int x, int y, int z)
@@ -93,8 +132,17 @@ namespace Vintagestory.TreasureChest
         {
             ushort blockID = api.WorldManager.GetBlockId("chest-south");
             api.World.BlockAccessor.SetBlock(blockID, pos);
-            IBlockEntityContainer chest = (IBlockEntityContainer)api.World.BlockAccessor.GetBlockEntity(pos);
-            AddItemStacks(chest, MakeItemStacks());
+            IBlockEntityContainer chest = (IBlockEntityContainer)api.World.BlockAccessor.GetBlockEntity(pos);       
+            if(chest == null)
+            {
+                System.Diagnostics.Debug.WriteLine("Chest was null at " + pos.ToString(), new object[] { });
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Treasure chest at " + pos.ToString(), new object[] { });
+                AddItemStacks(chest, MakeItemStacks());
+            }
+            
         }
 
         private void AddItemStacks(IBlockEntityContainer chest, IEnumerable<ItemStack> itemStacks)
