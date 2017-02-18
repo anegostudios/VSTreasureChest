@@ -127,32 +127,32 @@ namespace Vintagestory.Mods.TreasureChest
             Block block = chunkGenBlockAccessor.GetBlock(pos);
             if(IsTreeLog(block))
             {
-                for (int i = pos.Y; i >= 0; i--)
+                for (int posY = pos.Y; posY >= 0; posY--)
                 {
-                    Block underBlock = chunkGenBlockAccessor.GetBlock(pos.X, i, pos.Z);
+                    Block underBlock = chunkGenBlockAccessor.GetBlock(pos.X, posY, pos.Z);
                     if(!IsTreeLog(underBlock))
                     {
                         //Found the bottom log, now we need to move the chest to a free spot next to the base of the tree
-                        BlockPos bottomLog = new BlockPos(pos.X, i + 1, pos.Z);
-                        Block neighbor = chunkGenBlockAccessor.GetBlock(pos.X + 1, i + 1, pos.Z);
+                        BlockPos bottomLog = new BlockPos(pos.X, posY + 1, pos.Z);
+                        Block neighbor = chunkGenBlockAccessor.GetBlock(pos.X + 1, posY + 1, pos.Z);
                         if(neighbor.Id == 0)
                         {
-                            return new BlockPos(pos.X + 1, i + 1, pos.Z);
+                            return new BlockPos(pos.X + 1, posY + 1, pos.Z);
                         }
-                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X - 1, i + 1, pos.Z);
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X - 1, posY + 1, pos.Z);
                         if (neighbor.Id == 0)
                         {
-                            return new BlockPos(pos.X - 1, i + 1, pos.Z);
+                            return new BlockPos(pos.X - 1, posY + 1, pos.Z);
                         }
-                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, i + 1, pos.Z + 1);
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, posY + 1, pos.Z + 1);
                         if (neighbor.Id == 0)
                         {
-                            return new BlockPos(pos.X, i + 1, pos.Z + 1);
+                            return new BlockPos(pos.X, posY + 1, pos.Z + 1);
                         }
-                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, i + 1, pos.Z - 1);
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, posY + 1, pos.Z - 1);
                         if (neighbor.Id == 0)
                         {
-                            return new BlockPos(pos.X, i + 1, pos.Z - 1);
+                            return new BlockPos(pos.X, posY + 1, pos.Z - 1);
                         }
                         return null;
                     }
