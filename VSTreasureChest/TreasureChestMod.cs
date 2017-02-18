@@ -230,10 +230,7 @@ namespace Vintagestory.Mods.TreasureChest
             int slotNumber = 0;
             foreach (ItemStack itemStack in itemStacks)
             {
-                if (slotNumber > chest.Inventory.QuantitySlots)
-                {
-                    slotNumber = chest.Inventory.QuantitySlots - 1;
-                }
+                slotNumber = Math.Min(slotNumber, chest.Inventory.QuantitySlots - 1);
                 IItemSlot slot = chest.Inventory.GetSlot(slotNumber);
                 slot.Itemstack = itemStack;
                 slotNumber++;
