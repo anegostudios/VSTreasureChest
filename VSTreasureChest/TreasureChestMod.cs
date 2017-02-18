@@ -29,8 +29,6 @@ namespace Vintagestory.Mods.TreasureChest
 
         //Size of chunks. Chunks are cubes so this is the size of the cube.
         private int chunkSize;
-        //The Y-Height of the map
-        private int mapHeight;
 
         //Stores tree types that will be used for detecting trees for placing our chests
         private ISet<string> treeTypes;
@@ -49,7 +47,6 @@ namespace Vintagestory.Mods.TreasureChest
             this.api = api;
             this.worldBlockAccessor = api.World.BlockAccessor;
             this.chunkSize = worldBlockAccessor.ChunkSize;
-            this.mapHeight = worldBlockAccessor.MapSizeY;
             this.treeTypes = new HashSet<string>();
             LoadTreeTypes(treeTypes);
 
@@ -102,7 +99,7 @@ namespace Vintagestory.Mods.TreasureChest
                     {
                         for (int z = 0; z < chunkSize; z++)
                         {
-                            for (int y = 0; y < mapHeight; y++)
+                            for (int y = 0; y < worldBlockAccessor.MapSizeY; y++)
                             {
                                 blockPos.X = chunkX * chunkSize + x;
                                 blockPos.Y = y;
