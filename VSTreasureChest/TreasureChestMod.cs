@@ -118,7 +118,29 @@ namespace Vintagestory.Mods.TreasureChest
                     Block underBlock = chunkGenBlockAccessor.GetBlock(pos.X, i, pos.Z);
                     if(!IsTree(underBlock))
                     {
-                        return new BlockPos(pos.X, i + 1, pos.Z);
+                        //Found the bottom log, now we need to move the chest to a free spot next to the base of the tree
+                        BlockPos bottomLog = new BlockPos(pos.X, i + 1, pos.Z);
+                        Block neighbor = chunkGenBlockAccessor.GetBlock(pos.X + 1, i + 1, pos.Z);
+                        if(neighbor.Id == 0)
+                        {
+                            return new BlockPos(pos.X + 1, i + 1, pos.Z);
+                        }
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X - 1, i + 1, pos.Z);
+                        if (neighbor.Id == 0)
+                        {
+                            return new BlockPos(pos.X - 1, i + 1, pos.Z);
+                        }
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, i + 1, pos.Z + 1);
+                        if (neighbor.Id == 0)
+                        {
+                            return new BlockPos(pos.X, i + 1, pos.Z + 1);
+                        }
+                        neighbor = chunkGenBlockAccessor.GetBlock(pos.X, i + 1, pos.Z - 1);
+                        if (neighbor.Id == 0)
+                        {
+                            return new BlockPos(pos.X, i + 1, pos.Z - 1);
+                        }
+                        return null;
                     }
                 }
             }
@@ -149,12 +171,12 @@ namespace Vintagestory.Mods.TreasureChest
             IBlockEntityContainer chest = (IBlockEntityContainer)blockAccessor.GetBlockEntity(pos); 
             if(chest == null)
             {
-                System.Diagnostics.Debug.WriteLine("Chest was null at " + pos.ToString(), new object[] { });
+                System.Diagnostics.Debug.WriteLine("FAILED TO PLACE TREASURE CHEST AT " + pos.ToString(), new object[] { });
             }
             else
             {
                 AddItemStacks(chest, MakeItemStacks());
-                System.Diagnostics.Debug.WriteLine("Treasure chest at " + pos.ToString(), new object[] { });
+                System.Diagnostics.Debug.WriteLine("Placed treasure chest at " + pos.ToString(), new object[] { });
             }   
         }
 
