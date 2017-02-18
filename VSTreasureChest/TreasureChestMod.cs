@@ -125,12 +125,12 @@ namespace Vintagestory.Mods.TreasureChest
         private BlockPos TryGetChestLocation(BlockPos pos)
         {
             Block block = chunkGenBlockAccessor.GetBlock(pos);
-            if(IsTree(block))
+            if(IsTreeLog(block))
             {
                 for (int i = pos.Y; i >= 0; i--)
                 {
                     Block underBlock = chunkGenBlockAccessor.GetBlock(pos.X, i, pos.Z);
-                    if(!IsTree(underBlock))
+                    if(!IsTreeLog(underBlock))
                     {
                         //Found the bottom log, now we need to move the chest to a free spot next to the base of the tree
                         BlockPos bottomLog = new BlockPos(pos.X, i + 1, pos.Z);
@@ -161,7 +161,7 @@ namespace Vintagestory.Mods.TreasureChest
             return null;
         }
 
-        private bool IsTree(Block block)
+        private bool IsTreeLog(Block block)
         {
             return treeTypes.Contains(block.Code);            
         }
