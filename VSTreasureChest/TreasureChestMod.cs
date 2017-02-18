@@ -12,10 +12,25 @@ namespace Vintagestory.Mods.TreasureChest
      */
     public class TreasureChestMod : ModBase
     {
-        private int minItems = 3;
-        private int maxItems = 10;
+        //The minimum number of items to place in the chest
+        private const int MIN_ITEMS = 3;
+        
+        //The maximum number of items to place in the chest
+        private const int MAX_ITEMS = 10;
+        
+        //The max number of chests to generate per chunk
+        private const int MAX_CHESTS_PER_CHUNK = 1;
+
+        //The probability of a chest spawning in a chunk
+        private const float CHEST_SPAWN_PROBABILITY = 0.80f;
+
+        //The main interface we will use for interacting with Vintage Story
         private ICoreServerAPI api;
+
+        //Size of chunks. Chunks are cubes so this is the size of the cube.
         private int chunkSize;
+        //The Y-Height of the map
+        private int mapHeight;
 
         //Stores tree types that will be used for detecting trees for placing our chests
         private ISet<string> treeTypes;
@@ -26,14 +41,15 @@ namespace Vintagestory.Mods.TreasureChest
         //Used for accessing blocks after chunk generation
         private IBlockAccessor worldBlockAccessor;
 
+        /**
+         * This is our starting point. This method will be called by the server.
+         */
         public override void StartServerSide(ICoreServerAPI api)
         {
-            //TODO: Remove this when mod is complete
-            //api.WorldManager.AutoGenerateChunks = false;
-
             this.api = api;
             this.worldBlockAccessor = api.World.BlockAccessor;
-            this.chunkSize = api.World.BlockAccessor.ChunkSize;
+            this.chunkSize = worldBlockAccessor.ChunkSize;
+            this.mapHeight = worldBlockAccessor.MapSizeY;
             this.treeTypes = new HashSet<string>();
             LoadTreeTypes(treeTypes);
 
@@ -76,18 +92,17 @@ namespace Vintagestory.Mods.TreasureChest
          */
         private void OnChunkColumnGeneration(IServerChunk[] chunks, int chunkX, int chunkZ)
         {
-            BlockPos blockPos = new BlockPos();
-
             for (int i = 0; i < chunks.Length; i++)
             {
-                IServerChunk chunk = chunks[i];
-                if(ShouldPlaceChest())
+                int chestsPlacedCount = 0;
+                if(chestsPlacedCount < MAX_CHESTS_PER_CHUNK && ShouldPlaceChest())
                 {
-                    for (int x = 0; x < chunks.Length; x++)
+                    BlockPos blockPos = new BlockPos();
+                    for (int x = 0; x < chunkSize; x++)
                     {
-                        for (int z = 0; z < chunks.Length; z++)
+                        for (int z = 0; z < chunkSize; z++)
                         {
-                            for (int y = 0; y < 256; y++)
+                            for (int y = 0; y < mapHeight; y++)
                             {
                                 blockPos.X = chunkX * chunkSize + x;
                                 blockPos.Y = y;
@@ -96,8 +111,11 @@ namespace Vintagestory.Mods.TreasureChest
                                 BlockPos chestLocation = TryGetChestLocation(blockPos);
                                 if (chestLocation != null)
                                 {
-                                    PlaceTreasureChest(chunkGenBlockAccessor, chestLocation);
-                                    return;
+                                    bool chestWasPlaced = PlaceTreasureChest(chunkGenBlockAccessor, chestLocation);
+                                    if(chestWasPlaced)
+                                    {
+                                        chestsPlacedCount++;
+                                    }
                                 }
                             }
                         }
@@ -112,7 +130,6 @@ namespace Vintagestory.Mods.TreasureChest
             Block block = chunkGenBlockAccessor.GetBlock(pos);
             if(IsTree(block))
             {
-                System.Diagnostics.Debug.WriteLine("Found tree " + block.Code + " at " + pos.ToString(), new object[] { });
                 for (int i = pos.Y; i >= 0; i--)
                 {
                     Block underBlock = chunkGenBlockAccessor.GetBlock(pos.X, i, pos.Z);
@@ -163,29 +180,29 @@ namespace Vintagestory.Mods.TreasureChest
         /**
          * Places a chest filled with random items at the given world coordinates using the given IBlockAccessor
         */
-        private void PlaceTreasureChest(IBlockAccessor blockAccessor, BlockPos pos)
+        private bool PlaceTreasureChest(IBlockAccessor blockAccessor, BlockPos pos)
         {
             ushort blockID = api.WorldManager.GetBlockId("chest-south");
-            blockAccessor.SetBlock(blockID, pos);
-
-            IBlockEntityContainer chest = (IBlockEntityContainer)blockAccessor.GetBlockEntity(pos); 
-            if(chest == null)
+            Block chest = api.WorldManager.GetBlockType(blockID);
+            chest.TryPlaceBlockForWorldGen(blockAccessor, pos, BlockFacing.UP);
+            IBlockEntityContainer chestEntity = (IBlockEntityContainer)blockAccessor.GetBlockEntity(pos);
+            if (chestEntity != null)
             {
-                System.Diagnostics.Debug.WriteLine("FAILED TO PLACE TREASURE CHEST AT " + pos.ToString(), new object[] { });
+                AddItemStacks(chestEntity, MakeItemStacks());
+                System.Diagnostics.Debug.WriteLine("Placed treasure chest at " + pos.ToString(), new object[] { });
+                return true;
             }
             else
             {
-                AddItemStacks(chest, MakeItemStacks());
-                System.Diagnostics.Debug.WriteLine("Placed treasure chest at " + pos.ToString(), new object[] { });
-            }   
+                System.Diagnostics.Debug.WriteLine("FAILED TO PLACE TREASURE CHEST AT " + pos.ToString(), new object[] { });
+                return false;
+            }
         }
 
-        //TODO: Always places a single chest in a chunk for testing.
         private bool ShouldPlaceChest()
         {
-            return true;
-            //int randomNumber = api.World.Rand.Next(0, 100);
-            //return randomNumber > 1 && randomNumber <= 6;//5% chance
+            int randomNumber = api.World.Rand.Next(0, 100);
+            return randomNumber > 0 && randomNumber <= CHEST_SPAWN_PROBABILITY*100;
         }
 
         //Makes a list of random ItemStacks to be placed inside our chest
@@ -193,7 +210,7 @@ namespace Vintagestory.Mods.TreasureChest
         {
             ShuffleBag<string> shuffleBag = MakeShuffleBag();
             Dictionary<string, ItemStack> itemStacks = new Dictionary<string, ItemStack>();
-            int grabCount = api.World.Rand.Next(minItems, maxItems);
+            int grabCount = api.World.Rand.Next(MIN_ITEMS, MAX_ITEMS);
             for (int i = 0; i < grabCount; i++)
             {
                 string nextItem = shuffleBag.Next();
