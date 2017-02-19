@@ -60,6 +60,14 @@ namespace Vintagestory.Mods.TreasureChest
             this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Vegetation);
         }
 
+        /// <summary>
+        /// Our mod only needs to be loaded by the server
+        /// </summary>
+        public override bool ShouldLoad(EnumAppSide side)
+        {
+            return side == EnumAppSide.Server;
+        }
+
         ///<summary>
         /// Loads tree types from worldproperties/block/wood.json. Used for detecting trees for chest placement.
         /// </summary>
@@ -200,59 +208,59 @@ namespace Vintagestory.Mods.TreasureChest
         /// <summary>
         /// Makes a list of random ItemStacks to be placed inside our chest
         /// </summary>
-        private IEnumerable<ItemStack> MakeItemStacks()
+private IEnumerable<ItemStack> MakeItemStacks()
+{
+    ShuffleBag<string> shuffleBag = MakeShuffleBag();
+    Dictionary<string, ItemStack> itemStacks = new Dictionary<string, ItemStack>();
+    int grabCount = api.World.Rand.Next(MIN_ITEMS, MAX_ITEMS);
+    for (int i = 0; i < grabCount; i++)
+    {
+        string nextItem = shuffleBag.Next();
+        Item item = api.World.GetItem(nextItem);
+        if (itemStacks.ContainsKey(nextItem))
         {
-            ShuffleBag<string> shuffleBag = MakeShuffleBag();
-            Dictionary<string, ItemStack> itemStacks = new Dictionary<string, ItemStack>();
-            int grabCount = api.World.Rand.Next(MIN_ITEMS, MAX_ITEMS);
-            for (int i = 0; i < grabCount; i++)
-            {
-                string nextItem = shuffleBag.Next();
-                Item item = api.World.GetItem(nextItem);
-                if (itemStacks.ContainsKey(nextItem))
-                {
-                    itemStacks[nextItem].StackSize++;
-                }
-                else
-                {
-                    itemStacks.Add(nextItem, new ItemStack(item));
-                }
-            }
-            return itemStacks.Values;
+            itemStacks[nextItem].StackSize++;
         }
+        else
+        {
+            itemStacks.Add(nextItem, new ItemStack(item));
+        }
+    }
+    return itemStacks.Values;
+}
 
         ///<summary>
         ///Adds the given list of ItemStacks to the first slots in the given chest.
         ///</summary>
-        private void AddItemStacks(IBlockEntityContainer chest, IEnumerable<ItemStack> itemStacks)
-        {
-            int slotNumber = 0;
-            foreach (ItemStack itemStack in itemStacks)
-            {
-                slotNumber = Math.Min(slotNumber, chest.Inventory.QuantitySlots - 1);
-                IItemSlot slot = chest.Inventory.GetSlot(slotNumber);
-                slot.Itemstack = itemStack;
-                slotNumber++;
-            }
-        }
+private void AddItemStacks(IBlockEntityContainer chest, IEnumerable<ItemStack> itemStacks)
+{
+    int slotNumber = 0;
+    foreach (ItemStack itemStack in itemStacks)
+    {
+        slotNumber = Math.Min(slotNumber, chest.Inventory.QuantitySlots - 1);
+        IItemSlot slot = chest.Inventory.GetSlot(slotNumber);
+        slot.Itemstack = itemStack;
+        slotNumber++;
+    }
+}
 
         /// <summary>
         /// Creates our ShuffleBag to pick from when generating items for the chest
         /// </summary>
-        private ShuffleBag<string> MakeShuffleBag()
-        {
-            ShuffleBag<string> shuffleBag = new ShuffleBag<string>(100, api.World.Rand);
-            shuffleBag.Add("ingot-iron", 10);
-            shuffleBag.Add("ingot-bismuth", 5);
-            shuffleBag.Add("ingot-silver", 5);
-            shuffleBag.Add("ingot-zinc", 5);
-            shuffleBag.Add("ingot-titanium", 5);
-            shuffleBag.Add("ingot-platinum", 5);
-            shuffleBag.Add("ingot-chromium", 5);
-            shuffleBag.Add("ingot-tin", 5);
-            shuffleBag.Add("ingot-lead", 5);
-            shuffleBag.Add("ingot-gold", 5);
-            return shuffleBag;
-        }
+private ShuffleBag<string> MakeShuffleBag()
+{
+    ShuffleBag<string> shuffleBag = new ShuffleBag<string>(100, api.World.Rand);
+    shuffleBag.Add("ingot-iron", 10);
+    shuffleBag.Add("ingot-bismuth", 5);
+    shuffleBag.Add("ingot-silver", 5);
+    shuffleBag.Add("ingot-zinc", 5);
+    shuffleBag.Add("ingot-titanium", 5);
+    shuffleBag.Add("ingot-platinum", 5);
+    shuffleBag.Add("ingot-chromium", 5);
+    shuffleBag.Add("ingot-tin", 5);
+    shuffleBag.Add("ingot-lead", 5);
+    shuffleBag.Add("ingot-gold", 5);
+    return shuffleBag;
+}
     }
 }
