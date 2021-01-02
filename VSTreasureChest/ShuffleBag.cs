@@ -1,35 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Vintagestory.Mods.TreasureChest
+namespace VSTreasureChest
 {
     /// <summary>
     /// Data structure for picking random items
     /// </summary>
     public class ShuffleBag<T>
     {
-        private Random random = new Random();
-        private List<T> data;
+        private readonly Random _random = new Random();
+        private readonly List<T> _data;
+        private T _currentItem;
+        private int _currentPosition = -1;
 
-        private T currentItem;
-        private int currentPosition = -1;
-
-        private int Capacity { get { return data.Capacity; } }
-        public int Size { get { return data.Count; } }
+        public int Size => _data.Count;
 
         public ShuffleBag(int initCapacity)
         {
-            this.data = new List<T>(initCapacity);
-            this.random = new Random();
+            _data = new List<T>(initCapacity);
         }
 
         public ShuffleBag(int initCapacity, Random random)
         {
-            this.random = random;
-            this.data = new List<T>(initCapacity);
+            _random = random;
+            _data = new List<T>(initCapacity);
         }
 
         /// <summary>
@@ -37,10 +31,12 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         public void Add(T item, int amount)
         {
-            for (int i = 0; i < amount; i++)
-                data.Add(item);
+            for (var i = 0; i < amount; i++)
+            {
+                _data.Add(item);
+            }
 
-            currentPosition = Size - 1;
+            _currentPosition = Size - 1;
         }
 
         /// <summary>
@@ -48,22 +44,22 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         public T Next()
         {
-            if (currentPosition < 1)
+            if (_currentPosition < 1)
             {
-                currentPosition = Size - 1;
-                currentItem = data[0];
+                _currentPosition = Size - 1;
+                _currentItem = _data[0];
 
-                return currentItem;
+                return _currentItem;
             }
 
-            var pos = random.Next(currentPosition);
+            var pos = _random.Next(_currentPosition);
 
-            currentItem = data[pos];
-            data[pos] = data[currentPosition];
-            data[currentPosition] = currentItem;
-            currentPosition--;
+            _currentItem = _data[pos];
+            _data[pos] = _data[_currentPosition];
+            _data[_currentPosition] = _currentItem;
+            _currentPosition--;
 
-            return currentItem;
+            return _currentItem;
         }
     }
 }

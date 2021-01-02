@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Vintagestory.API.Common;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -34,3 +35,7 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: ModDependency("game")]
+[assembly: ModInfo("VSTreasureChest", "vstreasurechest", Version = "1.0.0", Authors = new string[] { "Chapp007" },
+    Website = "https://github.com/anegostudios/VSTreasureChest", Description = "Spawns treasure chest at random during world generation",
+    RequiredOnClient = false)]
