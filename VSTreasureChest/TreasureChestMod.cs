@@ -1,63 +1,65 @@
 ﻿using System;
 using System.Collections.Generic;
-using Vintagestory.API;
+using System.Diagnostics;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
-using Vintagestory.API.Interfaces;
+using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
-namespace Vintagestory.Mods.TreasureChest
+namespace VSTreasureChest
 {
     /// <summary>
     /// Mod that places chests filled with random items at the base of trees. Also supports a /treasure command for 
     /// placing a chest in front of the player.
     /// </summary>
-    public class TreasureChestMod : ModBase
+    public class TreasureChestMod : ModSystem
     {
         //The minimum number of items to place in the chest
-        private const int MIN_ITEMS = 3;
-        
+        private const int MinItems = 3;
+
         //The maximum number of items to place in the chest
-        private const int MAX_ITEMS = 10;
-        
+        private const int MaxItems = 10;
+
         //The max number of chests to generate per chunk
-        private const int MAX_CHESTS_PER_CHUNK = 1;
+        private const int MaxChestsPerChunk = 1;
 
         //The probability of a chest spawning in a chunk
-        private const float CHEST_SPAWN_PROBABILITY = 0.80f;
+        private const float ChestSpawnProbability = 0.80f;
 
         //The main interface we will use for interacting with Vintage Story
-        private ICoreServerAPI api;
+        private ICoreServerAPI _api;
 
         //Size of chunks. Chunks are cubes so this is the size of the cube.
-        private int chunkSize;
+        private int _chunkSize;
 
         //Stores tree types that will be used for detecting trees for placing our chests
-        private ISet<string> treeTypes;
+        private ISet<string> _treeTypes;
 
         //Used for accessing blocks during chunk generation
-        private IBlockAccessor chunkGenBlockAccessor;
+        private IBlockAccessor _chunkGenBlockAccessor;
 
         //Used for accessing blocks after chunk generation
-        private IBlockAccessor worldBlockAccessor;
+        private IBlockAccessor _worldBlockAccessor;
 
         /// <summary>
         /// This is our starting point. This method will be called by the server.
         /// </summary>
         public override void StartServerSide(ICoreServerAPI api)
         {
-            this.api = api;
-            this.worldBlockAccessor = api.World.BlockAccessor;
-            this.chunkSize = worldBlockAccessor.ChunkSize;
-            this.treeTypes = new HashSet<string>();
-            LoadTreeTypes(treeTypes);
+            _api = api;
+            _worldBlockAccessor = api.World.BlockAccessor;
+            _chunkSize = _worldBlockAccessor.ChunkSize;
+            _treeTypes = new HashSet<string>();
+            LoadTreeTypes(_treeTypes);
 
             //Registers our command with the system's command registry.
-            this.api.RegisterCommand("treasure", "Place a treasure chest with random items", "", PlaceTreasureChestInFrontOfPlayer, Privilege.controlserver);
+            _api.RegisterCommand("treasure", "Place a treasure chest with random items", "", PlaceTreasureChestInFrontOfPlayer, Privilege.controlserver);
 
             //Registers a delegate to be called so we can get a reference to the chunk gen block accessor
-            this.api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
+            _api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
 
             //Registers a delegate to be called when a chunk column is generating in the Vegetation phase of generation
-            this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Vegetation);
+            _api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.PreDone, "standard");
         }
 
         /// <summary>
@@ -73,12 +75,13 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         private void LoadTreeTypes(ISet<string> treeTypes)
         {
-            WorldProperty treeTypesFromFile = api.Assets.TryGet("worldproperties/block/wood.json").ToObject<WorldProperty>();
-            foreach (WorldPropertyVariant variant in treeTypesFromFile.Variants)
+            var treeTypesFromFile = _api.Assets.TryGet("worldproperties/block/wood.json").ToObject<StandardWorldProperty>();
+            foreach (var variant in treeTypesFromFile.Variants)
             {
-                treeTypes.Add("log-" + variant.Code + "-ud");
+                treeTypes.Add($"log-grown-{variant.Code.Path}-ud");
             }
         }
+
         /// <summary>
         /// Stores the chunk gen thread's IBlockAccessor for use when generating chests during chunk gen. This callback
         /// is necessary because chunk loading happens in a separate thread and it's important to use this block accessor
@@ -86,7 +89,7 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         private void OnWorldGenBlockAccessor(IChunkProviderThread chunkProvider)
         {
-            chunkGenBlockAccessor = chunkProvider.GetBlockAccessor(true);
+            _chunkGenBlockAccessor = chunkProvider.GetBlockAccessor(true);
         }
 
         /// <summary>
@@ -94,37 +97,37 @@ namespace Vintagestory.Mods.TreasureChest
         /// and if we should we then loop through each block to find a tree. When one is found we place the block at the base
         /// of the tree. At most one chest will be placed per chunk.
         /// </summary>
-        private void OnChunkColumnGeneration(IServerChunk[] chunks, int chunkX, int chunkZ)
+        private void OnChunkColumnGeneration(IServerChunk[] chunks, int chunkX, int chunkZ, ITreeAttribute chunkgenparams)
         {
-            int chestsPlacedCount = 0;
-            for (int i = 0; i < chunks.Length; i++)
+            var chestsPlacedCount = 0;
+            for (var i = 0; i < chunks.Length; i++)
             {
-                if(ShouldPlaceChest())
+                if (ShouldPlaceChest())
                 {
-                    BlockPos blockPos = new BlockPos();
-                    for (int x = 0; x < chunkSize; x++)
+                    var blockPos = new BlockPos();
+                    for (var x = 0; x < _chunkSize; x++)
                     {
-                        for (int z = 0; z < chunkSize; z++)
+                        for (var z = 0; z < _chunkSize; z++)
                         {
-                            for (int y = 0; y < worldBlockAccessor.MapSizeY; y++)
+                            for (var y = 0; y < _worldBlockAccessor.MapSizeY; y++)
                             {
-                                if(chestsPlacedCount < MAX_CHESTS_PER_CHUNK)
+                                if (chestsPlacedCount < MaxChestsPerChunk)
                                 {
-                                    blockPos.X = chunkX * chunkSize + x;
+                                    blockPos.X = chunkX * _chunkSize + x;
                                     blockPos.Y = y;
-                                    blockPos.Z = chunkZ * chunkSize + z;
+                                    blockPos.Z = chunkZ * _chunkSize + z;
 
-                                    BlockPos chestLocation = TryGetChestLocation(blockPos);
+                                    var chestLocation = TryGetChestLocation(blockPos);
                                     if (chestLocation != null)
                                     {
-                                        bool chestWasPlaced = PlaceTreasureChest(chunkGenBlockAccessor, chestLocation);
+                                        var chestWasPlaced = PlaceTreasureChest(_chunkGenBlockAccessor, chestLocation);
                                         if (chestWasPlaced)
                                         {
                                             chestsPlacedCount++;
                                         }
                                     }
                                 }
-                                else//Max chests have been placed for this chunk
+                                else //Max chests have been placed for this chunk
                                 {
                                     return;
                                 }
@@ -140,20 +143,23 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         private BlockPos TryGetChestLocation(BlockPos pos)
         {
-            Block block = chunkGenBlockAccessor.GetBlock(pos);
-            if(IsTreeLog(block))
+            var block = _chunkGenBlockAccessor.GetBlock(pos);
+            if (IsTreeLog(block))
             {
-                for (int posY = pos.Y; posY >= 0; posY--)
+                for (var posY = pos.Y; posY >= 0; posY--)
                 {
                     while (pos.Y-- > 0)
                     {
-                        Block underBlock = chunkGenBlockAccessor.GetBlock(pos);
-                        if (IsTreeLog(underBlock)) continue;
-
-                        foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
+                        var underBlock = _chunkGenBlockAccessor.GetBlock(pos);
+                        if (IsTreeLog(underBlock))
                         {
-                            BlockPos adjacentPos = pos.AddCopy(facing).Up();
-                            if (chunkGenBlockAccessor.GetBlock(adjacentPos).Id == 0)
+                            continue;
+                        }
+
+                        foreach (var facing in BlockFacing.HORIZONTALS)
+                        {
+                            var adjacentPos = pos.AddCopy(facing).Up();
+                            if (_chunkGenBlockAccessor.GetBlock(adjacentPos).Id == 0)
                             {
                                 return adjacentPos;
                             }
@@ -161,12 +167,13 @@ namespace Vintagestory.Mods.TreasureChest
                     }
                 }
             }
+
             return null;
         }
 
         private bool IsTreeLog(Block block)
         {
-            return treeTypes.Contains(block.Code);            
+            return _treeTypes.Contains(block.Code.Path);
         }
 
         /// <summary>
@@ -174,7 +181,7 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         private void PlaceTreasureChestInFrontOfPlayer(IServerPlayer player, int groupId, CmdArgs args)
         {
-            PlaceTreasureChest(api.World.BlockAccessor, player.Entity.Pos.HorizontalAheadCopy(2).AsBlockPos);
+            PlaceTreasureChest(_api.World.BlockAccessor, player.Entity.Pos.HorizontalAheadCopy(2).AsBlockPos);
         }
 
         /// <summary>
@@ -182,85 +189,96 @@ namespace Vintagestory.Mods.TreasureChest
         /// </summary>
         private bool PlaceTreasureChest(IBlockAccessor blockAccessor, BlockPos pos)
         {
-            ushort blockID = api.WorldManager.GetBlockId("chest-south");
-            Block chest = api.WorldManager.GetBlockType(blockID);
-            chest.TryPlaceBlockForWorldGen(blockAccessor, pos, BlockFacing.UP);
-            IBlockEntityContainer chestEntity = (IBlockEntityContainer)blockAccessor.GetBlockEntity(pos);
-            if (chestEntity != null)
+            var blockID = _api.WorldManager.GetBlockId(new AssetLocation("chest-south"));
+            var chest = _api.World.BlockAccessor.GetBlock(blockID);
+
+            if (chest.TryPlaceBlockForWorldGen(blockAccessor, pos, BlockFacing.UP, null))
             {
-                AddItemStacks(chestEntity, MakeItemStacks());
-                System.Diagnostics.Debug.WriteLine("Placed treasure chest at " + pos.ToString(), new object[] { });
-                return true;
+                var block = blockAccessor.GetBlock(pos);
+                if (block.EntityClass != chest.EntityClass)
+                {
+                    return false;
+                }
+
+                //blockAccessor.SpawnBlockEntity(chest.EntityClass, pos); // needed?
+                var blockEntity = blockAccessor.GetBlockEntity(pos);
+                blockEntity.Initialize(_api);
+                var chestEntity = blockEntity as IBlockEntityContainer;
+                if (chestEntity != null)
+                {
+                    AddItemStacks(chestEntity, MakeItemStacks());
+                    Debug.WriteLine("Placed treasure chest at " + pos, new object[] { });
+                    return true;
+                }
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("FAILED TO PLACE TREASURE CHEST AT " + pos.ToString(), new object[] { });
-                return false;
-            }
+
+            Debug.WriteLine("FAILED TO PLACE TREASURE CHEST AT " + pos, new object[] { });
+            return false;
         }
 
         private bool ShouldPlaceChest()
         {
-            int randomNumber = api.World.Rand.Next(0, 100);
-            return randomNumber > 0 && randomNumber <= CHEST_SPAWN_PROBABILITY*100;
+            var randomNumber = _api.World.Rand.Next(0, 100);
+            return randomNumber > 0 && randomNumber <= ChestSpawnProbability * 100;
         }
 
         /// <summary>
         /// Makes a list of random ItemStacks to be placed inside our chest
         /// </summary>
-private IEnumerable<ItemStack> MakeItemStacks()
-{
-    ShuffleBag<string> shuffleBag = MakeShuffleBag();
-    Dictionary<string, ItemStack> itemStacks = new Dictionary<string, ItemStack>();
-    int grabCount = api.World.Rand.Next(MIN_ITEMS, MAX_ITEMS);
-    for (int i = 0; i < grabCount; i++)
-    {
-        string nextItem = shuffleBag.Next();
-        Item item = api.World.GetItem(nextItem);
-        if (itemStacks.ContainsKey(nextItem))
+        private IEnumerable<ItemStack> MakeItemStacks()
         {
-            itemStacks[nextItem].StackSize++;
+            var shuffleBag = MakeShuffleBag();
+            var itemStacks = new Dictionary<string, ItemStack>();
+            var grabCount = _api.World.Rand.Next(MinItems, MaxItems);
+            for (var i = 0; i < grabCount; i++)
+            {
+                var nextItem = shuffleBag.Next();
+                var item = _api.World.GetItem(new AssetLocation(nextItem));
+                if (itemStacks.ContainsKey(nextItem))
+                {
+                    itemStacks[nextItem].StackSize++;
+                }
+                else
+                {
+                    itemStacks.Add(nextItem, new ItemStack(item));
+                }
+            }
+
+            return itemStacks.Values;
         }
-        else
-        {
-            itemStacks.Add(nextItem, new ItemStack(item));
-        }
-    }
-    return itemStacks.Values;
-}
 
         ///<summary>
         ///Adds the given list of ItemStacks to the first slots in the given chest.
         ///</summary>
-private void AddItemStacks(IBlockEntityContainer chest, IEnumerable<ItemStack> itemStacks)
-{
-    int slotNumber = 0;
-    foreach (ItemStack itemStack in itemStacks)
-    {
-        slotNumber = Math.Min(slotNumber, chest.Inventory.QuantitySlots - 1);
-        IItemSlot slot = chest.Inventory.GetSlot(slotNumber);
-        slot.Itemstack = itemStack;
-        slotNumber++;
-    }
-}
+        private void AddItemStacks(IBlockEntityContainer chest, IEnumerable<ItemStack> itemStacks)
+        {
+            var slotNumber = 0;
+            foreach (var itemStack in itemStacks)
+            {
+                slotNumber = Math.Min(slotNumber, chest.Inventory.Count - 1);
+                var slot = chest.Inventory[slotNumber];
+                slot.Itemstack = itemStack;
+                slotNumber++;
+            }
+        }
 
         /// <summary>
         /// Creates our ShuffleBag to pick from when generating items for the chest
         /// </summary>
-private ShuffleBag<string> MakeShuffleBag()
-{
-    ShuffleBag<string> shuffleBag = new ShuffleBag<string>(100, api.World.Rand);
-    shuffleBag.Add("ingot-iron", 10);
-    shuffleBag.Add("ingot-bismuth", 5);
-    shuffleBag.Add("ingot-silver", 5);
-    shuffleBag.Add("ingot-zinc", 5);
-    shuffleBag.Add("ingot-titanium", 5);
-    shuffleBag.Add("ingot-platinum", 5);
-    shuffleBag.Add("ingot-chromium", 5);
-    shuffleBag.Add("ingot-tin", 5);
-    shuffleBag.Add("ingot-lead", 5);
-    shuffleBag.Add("ingot-gold", 5);
-    return shuffleBag;
-}
+        private ShuffleBag<string> MakeShuffleBag()
+        {
+            var shuffleBag = new ShuffleBag<string>(100, _api.World.Rand);
+            shuffleBag.Add("ingot-iron", 10);
+            shuffleBag.Add("ingot-bismuth", 5);
+            shuffleBag.Add("ingot-silver", 5);
+            shuffleBag.Add("ingot-zinc", 5);
+            shuffleBag.Add("ingot-titanium", 5);
+            shuffleBag.Add("ingot-platinum", 5);
+            shuffleBag.Add("ingot-chromium", 5);
+            shuffleBag.Add("ingot-tin", 5);
+            shuffleBag.Add("ingot-lead", 5);
+            shuffleBag.Add("ingot-gold", 5);
+            return shuffleBag;
+        }
     }
 }
